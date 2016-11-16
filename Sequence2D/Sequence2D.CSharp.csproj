@@ -249,6 +249,7 @@
     <Compile Include="Assets\Scripts\GameplayManager.cs" />
     <Compile Include="Assets\Scripts\MusicManager.cs" />
     <Compile Include="Assets\Scripts\SfxManager.cs" />
+    <Compile Include="Assets\Scripts\ShareCreator.cs" />
     <Compile Include="Assets\Scripts\SocialIds.cs" />
     <Compile Include="Assets\Scripts\SocialManager.cs" />
     <Compile Include="Assets\Scripts\Tween.cs" />

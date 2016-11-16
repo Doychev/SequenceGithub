@@ -2,19 +2,25 @@
 using UnityEngine.UI;
 using UnityEngine.Advertisements;
 using System.Collections;
+using UnityEngine.EventSystems;
 
 public class GameplayManager : MonoBehaviour {
 
-    public GameObject[] buttons;
+    public GameObject[] buttons, buttonOverlays;
     public GameObject levelText, scoreText, announcementsText;
-    public GameObject savingPanel;
+    public GameObject savingPanel, tutorialPanel, tutorialChoice, tutorialHighlights, tutorialEnd;
 
     private int levelDifficulty;
     private int currentDigit;
     private int currentScore = 0;
     private int totalScore = 0;
+    private int guidedClicks = 0;
+    private bool showTutorial = true;
     private bool savedInCurrentGame = false;
+    private bool gameStarted = false;
     private ArrayList currentSequence;
+
+    private const int GUIDED_CLICKS_MAX = 5;
 
     private SfxManager sfxManager;
     private SocialManager socialManager;
@@ -26,17 +32,52 @@ public class GameplayManager : MonoBehaviour {
 
         sfxManager = GameObject.Find("SfxManager").GetComponent<SfxManager>();
         socialManager = GameObject.Find("SocialManager").GetComponent<SocialManager>();
-        savingPanel = GameObject.Find("Saving Panel");
         savingPanel.SetActive(false);
         totalScore = PlayerPrefs.GetInt("totalScore", 0);
+        showTutorial = PlayerPrefs.GetInt("showTutorial", 1) == 1;
+        tutorialHighlights.SetActive(false);
+        tutorialEnd.SetActive(false);
 
-        //show tutorial if needed
+        if (!showTutorial)
+        {
+            tutorialPanel.SetActive(false);
+            StartGame();
+        }
+    }
+
+    public void startTutorial()
+    {
+        tutorialChoice.SetActive(false);
+        tutorialPanel.SetActive(false);
         StartGame();
+    }
 
-	}
+    public void closeTutorial()
+    {
+        PlayerPrefs.SetInt("showTutorial", -1);
+        showTutorial = false;
+        tutorialPanel.SetActive(false);
+        if (!gameStarted)
+        {
+            StartGame();
+        }
+    }
+
+    public void showTutorialEnd()
+    {
+        tutorialHighlights.SetActive(false);
+        tutorialEnd.SetActive(true);
+    }
+
+    public void finishTutorial()
+    {
+        closeTutorial();
+        StartCoroutine(InitiateSequence(true));
+    }
 
     public void StartGame()
     {
+        gameStarted = true;
         savedInCurrentGame = false;
         levelDifficulty = 2;
         currentScore = 0;
@@ -81,6 +122,11 @@ public class GameplayManager : MonoBehaviour {
             }
         }
         yield return new WaitForSeconds(0.45f);
+        bool tutorialHighlightsActive = tutorialHighlights.activeInHierarchy;
+        if (showTutorial)
+        {
+            tutorialHighlights.SetActive(false);
+        }
         setAnnouncementsText("Watch carefully!");
         yield return new WaitForSeconds(0.75f);
         for (int i = 0; i < currentSequence.Count; i++)
@@ -93,8 +139,28 @@ public class GameplayManager : MonoBehaviour {
                 yield return new WaitForSeconds(0.08f);
             }
         }
+        if (showTutorial)
+        {
+            tutorialHighlights.SetActive(tutorialHighlightsActive);
+        }
         setAnnouncementsText("Repeat the sequence!");
+        if (showTutorial)
+        {
+            yield return new WaitForSeconds(0.2f);
+            tutorialPanel.SetActive(true);
+            tutorialHighlights.SetActive(true);
+            Color color = buttonOverlays[(int)currentSequence[0] - 1].GetComponent<Image>().color;
+            buttonOverlays[(int)currentSequence[0] - 1].GetComponent<Image>().color = new Color(color.r, color.g, color.b, 0);
+        }
         playing = true;
+    }
+
+    public void simulateClick(int number)
+    {
+        if (currentSequence[currentDigit].Equals(number + 1))
+        {
+            buttons[number].GetComponent<Button>().onClick.Invoke();
+        }
     }
 
     public void highlightButton(int number, GameButtonSpriteHandler.SpriteType type)
@@ -125,6 +191,13 @@ public class GameplayManager : MonoBehaviour {
         }
     }
 
+    public IEnumerator swapOverlayColor(int button, float delay, float alpha)
+    {
+        yield return new WaitForSeconds(delay);
+        Color color = buttonOverlays[(int)currentSequence[button] - 1].GetComponent<Image>().color;
+        buttonOverlays[(int)currentSequence[button] - 1].GetComponent<Image>().color = new Color(color.r, color.g, color.b, alpha);
+    }
+
     public void buttonClicked(int number)
     {
         if (playing)
@@ -132,6 +205,11 @@ public class GameplayManager : MonoBehaviour {
             playing = false;
             if (currentSequence[currentDigit].Equals(number))
             {
+                if (showTutorial)
+                {
+                    guidedClicks++;
+                    StartCoroutine(swapOverlayColor(currentDigit, 0.1f, 1.0f));
+                }
                 currentDigit++;
                 currentScore++;
                 totalScore++;
@@ -139,18 +217,38 @@ public class GameplayManager : MonoBehaviour {
                 socialManager.unlockAchievements(totalScore, currentScore);
                 if (currentDigit >= levelDifficulty)
                 {
+                    if (showTutorial)
+                    {
+                        tutorialPanel.SetActive(false);
+                    }
                     sfxManager.playLevelSound();
                     setAnnouncementsText("Well done!");
                     StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.SUCCESS));
                     levelDifficulty++;
                     setLevelText(levelDifficulty - 1);
-                    StartCoroutine(InitiateSequence(true));
+                    if (showTutorial)
+                    {
+                        tutorialPanel.SetActive(true);
+                    }
+                    if (showTutorial && guidedClicks > GUIDED_CLICKS_MAX)
+                    {
+                        showTutorialEnd();
+                    } else
+                    {
+                        StartCoroutine(InitiateSequence(true));
+                    }
                 }
                 else
                 {
                     sfxManager.playSuccessSound();
                     highlightButton(number, GameButtonSpriteHandler.SpriteType.HIGHLIGHT);
                     StartCoroutine(delayedHighlightButton(number, GameButtonSpriteHandler.SpriteType.NORMAL, 0.2f));
+                    if (showTutorial)
+                    {
+                        playing = false;
+                        StartCoroutine(swapOverlayColor(currentDigit, 0.1f, 0.0f));
+                        playing = true;
+                    }
                     playing = true;
                 }
             }
@@ -205,6 +303,7 @@ public class GameplayManager : MonoBehaviour {
             PlayerPrefs.SetInt("highscore", currentScore);
         }
         socialManager.postScoreToLeaderboard(currentScore);
+        gameStarted = false;
     }
 
     public void ShowRewardedAd()
@@ -231,5 +330,4 @@ public class GameplayManager : MonoBehaviour {
                 break;
         }
     }
-
 }
