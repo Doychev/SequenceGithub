@@ -51,9 +51,23 @@ public class SocialManager : MonoBehaviour {
         Social.ShowLeaderboardUI();
     }
 
-    public void postScoreToLeaderboard(int score)
+    public void postScoreToLeaderboard(int score, ModeManager.GameMode mode)
     {
-        Social.ReportScore(score, SocialIds.leaderboard_sequence_leaderboard, (bool success) =>
+        string leaderboard = "";
+        if (mode.Equals(ModeManager.GameMode.CLASSIC))
+        {
+            leaderboard = SocialIds.leaderboard_classic_leaderboard;
+        }
+        else if (mode.Equals(ModeManager.GameMode.TEMPO))
+        {
+            leaderboard = SocialIds.leaderboard_tempo_leaderboard;
+        }
+        else if (mode.Equals(ModeManager.GameMode.WILD))
+        {
+            leaderboard = SocialIds.leaderboard_wild_leaderboard;
+        }
+
+        Social.ReportScore(score, leaderboard, (bool success) =>
         {
             // handle success or failure
         });
@@ -110,5 +124,11 @@ public class SocialManager : MonoBehaviour {
         });
     }
 
+    public void rateApp()
+    {
+        #if UNITY_ANDROID
+            Application.OpenURL("market://details?id=com.smd.sequence");
+        #endif        
+    }
 
 }

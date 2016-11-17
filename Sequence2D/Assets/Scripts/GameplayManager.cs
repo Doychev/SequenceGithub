@@ -20,6 +20,8 @@ public class GameplayManager : MonoBehaviour {
     private bool gameStarted = false;
     private ArrayList currentSequence;
 
+    private ModeManager.GameMode gameMode;
+
     private const int GUIDED_CLICKS_MAX = 5;
 
     private SfxManager sfxManager;
@@ -32,16 +34,46 @@ public class GameplayManager : MonoBehaviour {
 
         sfxManager = GameObject.Find("SfxManager").GetComponent<SfxManager>();
         socialManager = GameObject.Find("SocialManager").GetComponent<SocialManager>();
+        gameMode = GameObject.Find("ModeManager").GetComponent<ModeManager>().getSelectedMode();
         savingPanel.SetActive(false);
-        totalScore = PlayerPrefs.GetInt("totalScore", 0);
+
+
+        if (gameMode.Equals(ModeManager.GameMode.CLASSIC))
+        {
+            bool migrated = PlayerPrefs.GetInt("classicTotalScoreSet", 0) == 1;
+            if (migrated)
+            {
+                totalScore = PlayerPrefs.GetInt("classicTotalScore", 0);
+            }
+            else
+            {
+                totalScore = PlayerPrefs.GetInt("totalScore", 0);
+                PlayerPrefs.SetInt("classicTotalScore", totalScore);
+
+                int highscore = PlayerPrefs.GetInt("highscore", 0);
+                PlayerPrefs.SetInt("classicHighscore", highscore);
+
+                PlayerPrefs.SetInt("classicTotalScoreSet", 1);
+            }
+        }
+        else if (gameMode.Equals(ModeManager.GameMode.TEMPO))
+        {
+            totalScore = PlayerPrefs.GetInt("tempoTotalScore", 0);
+        }
+        else if (gameMode.Equals(ModeManager.GameMode.WILD))
+        {
+            totalScore = PlayerPrefs.GetInt("wildTotalScore", 0);
+        }
+
         showTutorial = PlayerPrefs.GetInt("showTutorial", 1) == 1;
+        showTutorial = true;
         tutorialHighlights.SetActive(false);
         tutorialEnd.SetActive(false);
 
         if (!showTutorial)
         {
             tutorialPanel.SetActive(false);
-            StartGame();
+            StartGame(gameMode);
         }
     }
 
@@ -49,7 +81,7 @@ public class GameplayManager : MonoBehaviour {
     {
         tutorialChoice.SetActive(false);
         tutorialPanel.SetActive(false);
-        StartGame();
+        StartGame(gameMode);
     }
 
     public void closeTutorial()
@@ -59,7 +91,7 @@ public class GameplayManager : MonoBehaviour {
         tutorialPanel.SetActive(false);
         if (!gameStarted)
         {
-            StartGame();
+            StartGame(gameMode);
         }
     }
 
@@ -75,7 +107,7 @@ public class GameplayManager : MonoBehaviour {
         StartCoroutine(InitiateSequence(true));
     }
 
-    public void StartGame()
+    public void StartGame(ModeManager.GameMode mode)
     {
         gameStarted = true;
         savedInCurrentGame = false;
@@ -107,12 +139,28 @@ public class GameplayManager : MonoBehaviour {
     {
         playing = false;
         currentDigit = 0;
-        if (adding)
+        if (gameMode.Equals(ModeManager.GameMode.CLASSIC))
         {
-            int random = Random.Range(1, 10);
-            currentSequence.Add(random);
+            if (adding)
+            {
+                int random = Random.Range(1, 10);
+                currentSequence.Add(random);
+            }
+            else
+            {
+                currentSequence = new ArrayList();
+                for (int i = 0; i < levelDifficulty; i++)
+                {
+                    int random = Random.Range(1, 10);
+                    currentSequence.Add(random);
+                }
+            }
         }
-        else
+        else if (gameMode.Equals(ModeManager.GameMode.TEMPO))
+        {
+
+        }
+        else if (gameMode.Equals(ModeManager.GameMode.WILD))
         {
             currentSequence = new ArrayList();
             for (int i = 0; i < levelDifficulty; i++)
@@ -121,6 +169,7 @@ public class GameplayManager : MonoBehaviour {
                 currentSequence.Add(random);
             }
         }
+
         yield return new WaitForSeconds(0.45f);
         bool tutorialHighlightsActive = tutorialHighlights.activeInHierarchy;
         if (showTutorial)
@@ -191,11 +240,11 @@ public class GameplayManager : MonoBehaviour {
         }
     }
 
-    public IEnumerator swapOverlayColor(int button, float delay, float alpha)
+    public IEnumerator swapOverlayColor(int position, float delay, float alpha)
     {
         yield return new WaitForSeconds(delay);
-        Color color = buttonOverlays[(int)currentSequence[button] - 1].GetComponent<Image>().color;
-        buttonOverlays[(int)currentSequence[button] - 1].GetComponent<Image>().color = new Color(color.r, color.g, color.b, alpha);
+        Color color = buttonOverlays[position - 1].GetComponent<Image>().color;
+        buttonOverlays[position - 1].GetComponent<Image>().color = new Color(color.r, color.g, color.b, alpha);
     }
 
     public void buttonClicked(int number)
@@ -208,7 +257,7 @@ public class GameplayManager : MonoBehaviour {
                 if (showTutorial)
                 {
                     guidedClicks++;
-                    StartCoroutine(swapOverlayColor(currentDigit, 0.1f, 1.0f));
+                    StartCoroutine(swapOverlayColor((int) currentSequence[currentDigit], 0.1f, 1.0f));
                 }
                 currentDigit++;
                 currentScore++;
@@ -246,7 +295,7 @@ public class GameplayManager : MonoBehaviour {
                     if (showTutorial)
                     {
                         playing = false;
-                        StartCoroutine(swapOverlayColor(currentDigit, 0.1f, 0.0f));
+                        StartCoroutine(swapOverlayColor((int) currentSequence[currentDigit], 0.1f, 0.0f));
                         playing = true;
                     }
                     playing = true;
@@ -297,12 +346,29 @@ public class GameplayManager : MonoBehaviour {
     public void endGame()
     {
         setAnnouncementsText("Wrong! Game over!");
-        PlayerPrefs.SetInt("totalScore", totalScore);
-        if (currentScore > PlayerPrefs.GetInt("highscore", 0))
-        {
-            PlayerPrefs.SetInt("highscore", currentScore);
+        if (gameMode.Equals(ModeManager.GameMode.CLASSIC)) {
+            PlayerPrefs.SetInt("classicTotalScore", totalScore);
+            if (currentScore > PlayerPrefs.GetInt("classicHighscore", 0))
+            {
+                PlayerPrefs.SetInt("classicHighscore", currentScore);
+            }
         }
-        socialManager.postScoreToLeaderboard(currentScore);
+        else if (gameMode.Equals(ModeManager.GameMode.TEMPO)) {
+            PlayerPrefs.SetInt("tempoTotalScore", totalScore);
+            if (currentScore > PlayerPrefs.GetInt("tempoHighscore", 0))
+            {
+                PlayerPrefs.SetInt("tempoHighscore", currentScore);
+            }
+        }
+        else if (gameMode.Equals(ModeManager.GameMode.WILD))
+        {
+            PlayerPrefs.SetInt("wildTotalScore", totalScore);
+            if (currentScore > PlayerPrefs.GetInt("wildHighscore", 0))
+            {
+                PlayerPrefs.SetInt("wildHighscore", currentScore);
+            }
+        }
+        socialManager.postScoreToLeaderboard(currentScore, gameMode);
         gameStarted = false;
     }
 

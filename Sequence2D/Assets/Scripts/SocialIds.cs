@@ -30,11 +30,13 @@ public static class SocialIds
         public const string achievement_pro = "CgkIxtr4y78NEAIQCw"; // <GPGSID>
         public const string achievement_welcome = "CgkIxtr4y78NEAIQAw"; // <GPGSID>
         public const string achievement_godlike = "CgkIxtr4y78NEAIQBw"; // <GPGSID>
+        public const string leaderboard_tempo_leaderboard = "CgkIxtr4y78NEAIQDw"; // <GPGSID>
         public const string achievement_regular = "CgkIxtr4y78NEAIQCg"; // <GPGSID>
         public const string achievement_starting_to_get_into_this = "CgkIxtr4y78NEAIQBA"; // <GPGSID>
         public const string achievement_247 = "CgkIxtr4y78NEAIQDA"; // <GPGSID>
         public const string achievement_newbie = "CgkIxtr4y78NEAIQCA"; // <GPGSID>
-        public const string leaderboard_sequence_leaderboard = "CgkIxtr4y78NEAIQDQ"; // <GPGSID>
+        public const string leaderboard_classic_leaderboard = "CgkIxtr4y78NEAIQDQ"; // <GPGSID>
+        public const string leaderboard_wild_leaderboard = "CgkIxtr4y78NEAIQDg"; // <GPGSID>
 
 }
 

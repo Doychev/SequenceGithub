@@ -247,6 +247,7 @@
     <Compile Include="Assets\Scripts\GameButtonSpriteHandler.cs" />
     <Compile Include="Assets\Scripts\GameManager.cs" />
     <Compile Include="Assets\Scripts\GameplayManager.cs" />
+    <Compile Include="Assets\Scripts\ModeManager.cs" />
     <Compile Include="Assets\Scripts\MusicManager.cs" />
     <Compile Include="Assets\Scripts\SfxManager.cs" />
     <Compile Include="Assets\Scripts\ShareCreator.cs" />
