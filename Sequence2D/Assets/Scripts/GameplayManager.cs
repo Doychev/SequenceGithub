@@ -2,13 +2,14 @@
 using UnityEngine.UI;
 using UnityEngine.Advertisements;
 using System.Collections;
-using UnityEngine.EventSystems;
 
 public class GameplayManager : MonoBehaviour {
 
     public GameObject[] buttons, buttonOverlays;
     public GameObject levelText, scoreText, announcementsText;
     public GameObject savingPanel, tutorialPanel, tutorialChoice, tutorialHighlights, tutorialEnd;
+    public GameObject timerHolder, timer;
+    public GameObject tempoEndPanel, finalScoreText;
 
     private int levelDifficulty;
     private int currentDigit;
@@ -21,6 +22,9 @@ public class GameplayManager : MonoBehaviour {
     private ArrayList currentSequence;
 
     private ModeManager.GameMode gameMode;
+
+    private float timeLeft;
+    private const float TEMPO_MODE_TIME = 90.0f;
 
     private const int GUIDED_CLICKS_MAX = 5;
 
@@ -36,6 +40,8 @@ public class GameplayManager : MonoBehaviour {
         socialManager = GameObject.Find("SocialManager").GetComponent<SocialManager>();
         gameMode = GameObject.Find("ModeManager").GetComponent<ModeManager>().getSelectedMode();
         savingPanel.SetActive(false);
+        timerHolder.SetActive(false);
+        tempoEndPanel.SetActive(false);
 
 
         if (gameMode.Equals(ModeManager.GameMode.CLASSIC))
@@ -66,22 +72,55 @@ public class GameplayManager : MonoBehaviour {
         }
 
         showTutorial = PlayerPrefs.GetInt("showTutorial", 1) == 1;
-        showTutorial = true;
         tutorialHighlights.SetActive(false);
         tutorialEnd.SetActive(false);
 
         if (!showTutorial)
         {
             tutorialPanel.SetActive(false);
-            StartGame(gameMode);
+            StartGame();
         }
+    }
+
+    void Update()
+    {
+        if (gameMode.Equals(ModeManager.GameMode.TEMPO) && gameStarted)
+        {
+            timeLeft -= Time.deltaTime;
+            timer.GetComponent<Text>().text = getTimerString(timeLeft);
+            if (timeLeft < 0)
+            {
+                endGame();
+            }
+        }
+    }
+
+    private string getTimerString(float time)
+    {
+        string result = "";
+        if (time < 0)
+        {
+            result = "0:00";
+        } else
+        {
+            int minutes = (int) time / 60;
+            int seconds = (int) time - minutes * 60;
+            if (seconds > 9)
+            {
+                result = minutes + ":" + seconds;
+            } else
+            {
+                result = minutes + ":0" + seconds;
+            }
+        }
+        return result;
     }
 
     public void startTutorial()
     {
         tutorialChoice.SetActive(false);
         tutorialPanel.SetActive(false);
-        StartGame(gameMode);
+        StartGame();
     }
 
     public void closeTutorial()
@@ -91,7 +130,7 @@ public class GameplayManager : MonoBehaviour {
         tutorialPanel.SetActive(false);
         if (!gameStarted)
         {
-            StartGame(gameMode);
+            StartGame();
         }
     }
 
@@ -107,7 +146,7 @@ public class GameplayManager : MonoBehaviour {
         StartCoroutine(InitiateSequence(true));
     }
 
-    public void StartGame(ModeManager.GameMode mode)
+    public void StartGame()
     {
         gameStarted = true;
         savedInCurrentGame = false;
@@ -117,6 +156,13 @@ public class GameplayManager : MonoBehaviour {
         setScoreText(0);
         setAnnouncementsText("Watch carefully!");
         StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.NORMAL));
+
+        if (gameMode.Equals(ModeManager.GameMode.TEMPO))
+        {
+            timeLeft = TEMPO_MODE_TIME;
+            timerHolder.SetActive(true);
+        }
+
         StartCoroutine(InitiateSequence());
     }
 
@@ -156,11 +202,7 @@ public class GameplayManager : MonoBehaviour {
                 }
             }
         }
-        else if (gameMode.Equals(ModeManager.GameMode.TEMPO))
-        {
-
-        }
-        else if (gameMode.Equals(ModeManager.GameMode.WILD))
+        else if (gameMode.Equals(ModeManager.GameMode.TEMPO) || gameMode.Equals(ModeManager.GameMode.WILD))
         {
             currentSequence = new ArrayList();
             for (int i = 0; i < levelDifficulty; i++)
@@ -180,9 +222,15 @@ public class GameplayManager : MonoBehaviour {
         yield return new WaitForSeconds(0.75f);
         for (int i = 0; i < currentSequence.Count; i++)
         {
-            highlightButton((int)currentSequence[i], GameButtonSpriteHandler.SpriteType.HIGHLIGHT);
+            if (gameStarted)
+            {
+                highlightButton((int)currentSequence[i], GameButtonSpriteHandler.SpriteType.HIGHLIGHT);
+            }
             yield return new WaitForSeconds(0.2f);
-            highlightButton((int)currentSequence[i], GameButtonSpriteHandler.SpriteType.NORMAL);
+            if (gameStarted)
+            {
+                highlightButton((int)currentSequence[i], GameButtonSpriteHandler.SpriteType.NORMAL);
+            }
             if (i < currentSequence.Count - 1)
             {
                 yield return new WaitForSeconds(0.08f);
@@ -192,7 +240,10 @@ public class GameplayManager : MonoBehaviour {
         {
             tutorialHighlights.SetActive(tutorialHighlightsActive);
         }
-        setAnnouncementsText("Repeat the sequence!");
+        if (gameStarted)
+        {
+            setAnnouncementsText("Repeat the sequence!");
+        }
         if (showTutorial)
         {
             yield return new WaitForSeconds(0.2f);
@@ -201,7 +252,10 @@ public class GameplayManager : MonoBehaviour {
             Color color = buttonOverlays[(int)currentSequence[0] - 1].GetComponent<Image>().color;
             buttonOverlays[(int)currentSequence[0] - 1].GetComponent<Image>().color = new Color(color.r, color.g, color.b, 0);
         }
-        playing = true;
+        if (gameStarted)
+        {
+            playing = true;
+        }
     }
 
     public void simulateClick(int number)
@@ -296,7 +350,6 @@ public class GameplayManager : MonoBehaviour {
                     {
                         playing = false;
                         StartCoroutine(swapOverlayColor((int) currentSequence[currentDigit], 0.1f, 0.0f));
-                        playing = true;
                     }
                     playing = true;
                 }
@@ -304,13 +357,37 @@ public class GameplayManager : MonoBehaviour {
             else
             {
                 sfxManager.playFailSound();
-                StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.FAIL, false));
-                if (!savedInCurrentGame)
+                if (gameMode.Equals(ModeManager.GameMode.TEMPO))
                 {
-                    StartCoroutine(activatePanel());
-                } else
+                    StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.FAIL));
+                    if (levelDifficulty > 2)
+                    {
+                        levelDifficulty--;
+                    }
+                    setLevelText(levelDifficulty - 1);
+                    currentScore -= 2;
+                    if (currentScore < 0)
+                    {
+                        currentScore = 0;
+                    }
+                    if (timeLeft > 3)
+                    {
+                        timeLeft -= 10;
+                    }
+                    setScoreText(currentScore);
+                    StartCoroutine(InitiateSequence(true));
+                }
+                else
                 {
-                    endGame();
+                    StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.FAIL, false));
+                    if (!savedInCurrentGame)
+                    {
+                        StartCoroutine(activatePanel());
+                    }
+                    else
+                    {
+                        endGame();
+                    }
                 }
             }
         }
@@ -345,8 +422,9 @@ public class GameplayManager : MonoBehaviour {
 
     public void endGame()
     {
-        setAnnouncementsText("Wrong! Game over!");
+        gameStarted = false;
         if (gameMode.Equals(ModeManager.GameMode.CLASSIC)) {
+            setAnnouncementsText("Wrong! Game over!");
             PlayerPrefs.SetInt("classicTotalScore", totalScore);
             if (currentScore > PlayerPrefs.GetInt("classicHighscore", 0))
             {
@@ -354,14 +432,20 @@ public class GameplayManager : MonoBehaviour {
             }
         }
         else if (gameMode.Equals(ModeManager.GameMode.TEMPO)) {
+            playing = false;
+            setAnnouncementsText("Time's up!");
+            StartCoroutine(highlightAll(GameButtonSpriteHandler.SpriteType.FAIL, false));
             PlayerPrefs.SetInt("tempoTotalScore", totalScore);
             if (currentScore > PlayerPrefs.GetInt("tempoHighscore", 0))
             {
                 PlayerPrefs.SetInt("tempoHighscore", currentScore);
             }
+            finalScoreText.GetComponent<Text>().text = currentScore + "";
+            tempoEndPanel.SetActive(true);
         }
         else if (gameMode.Equals(ModeManager.GameMode.WILD))
         {
+            setAnnouncementsText("Wrong! Game over!");
             PlayerPrefs.SetInt("wildTotalScore", totalScore);
             if (currentScore > PlayerPrefs.GetInt("wildHighscore", 0))
             {
@@ -369,7 +453,12 @@ public class GameplayManager : MonoBehaviour {
             }
         }
         socialManager.postScoreToLeaderboard(currentScore, gameMode);
-        gameStarted = false;
+    }
+
+    public void closeTempoPanel()
+    {
+        tempoEndPanel.SetActive(false);
+        ShowNormalAd();
     }
 
     public void ShowRewardedAd()
@@ -378,6 +467,14 @@ public class GameplayManager : MonoBehaviour {
         {
             ShowOptions options = new ShowOptions { resultCallback = HandleShowResult };
             Advertisement.Show("rewardedVideo", options);
+        }
+    }
+
+    public void ShowNormalAd()
+    {
+        if (Advertisement.IsReady())
+        {
+            Advertisement.Show();
         }
     }
 
